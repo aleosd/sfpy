@@ -3,10 +3,11 @@ import logging
 import time
 
 import requests
+from fake_useragent import UserAgent
 from requests.exceptions import RequestException
 
 from .settings import LOGGER_NAME, AUTH_RETRY_DELAY_SECONDS, PAGE, DOMAIN, \
-    USERNAME, PASSWORD
+    USERNAME, PASSWORD, USER_AGENT
 
 
 SF_PORTAL_URL = 'https://portal.sf.mail.ru/skyforgenews'
@@ -17,6 +18,9 @@ class Session:
     XHR_HEADERS = {
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
+        'Host': 'portal.sf.mail.ru',
+        'Referer': 'https://portal.sf.mail.ru/cult/missions',
+        'User-Agent': USER_AGENT or UserAgent().random
     }
 
     def __init__(self):

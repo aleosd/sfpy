@@ -17,7 +17,7 @@ PAGE = config.get('Auth', 'Page')
 USERNAME = config.get('Auth', 'Login')
 DOMAIN = config.get('Auth', 'Domain')
 PASSWORD = config.get('Auth', 'Password')
-
+USER_AGENT = config.get('Auth', 'UserAgent', fallback=None)
 
 LOGGER_NAME = 'sf-logger'
 
