@@ -103,13 +103,15 @@ class MissionManager:
 
     def free_missions(self):
         u"""
-        Возвращает словарь с миссиями, доступными для выполнения и не требующими
-        ресурсов
-        :return: Dict(mission.id: mission)
+        Возвращает список с миссиями, доступными для выполнения и не требующими
+        ресурсов. Список отсортирован по возрастанию длинтельности миссии и
+        количества адептов, необходимых для её выполнения
+
+        :return: List of missions
         """
         missions = [m for m in self.missions.values() if m.is_free() and
                     m.is_available()]
-        return sorted(missions, key=lambda m: m.duration)
+        return sorted(missions, key=lambda m: (m.duration, m.slot_count))
 
 
 class FollowerManager:
@@ -147,26 +149,28 @@ class FollowerManager:
         else:
             followers = self.followers.values()
         if isinstance(profession, (list, tuple)):
-            return [f for f in followers if
-                    f.get_profession_id() in profession]
+            return [f for f in followers if f.profession_id in profession]
         if isinstance(profession, int):
-            return [f for f in followers if
-                    f.get_profession_id() == profession]
+            return [f for f in followers if f.profession_id == profession]
         raise ValueError(u"Profession must be an int or list or tuple")
 
-    def get_efficient(self, count=-1, free=False):
+    def get_efficient(self, count=-1, free=False, exclude=None):
         u"""
         Возвращает отсортированный по эффективности список адептов.
         При помощи count можно указать ограничение на количество возвращаемых
         значений.
         :param free: Bool, учитывать только не занятых адептов
         :param count: int
+        :param exclude: followers list to exclude from result
         :return: list
         """
         if free:
             followers = self.free_followers().values()
         else:
             followers = self.followers.values()
+
+        if exclude:
+            followers = [f for f in followers if f not in exclude]
         fs = sorted(followers, key=lambda k: k.efficiency, reverse=True)
         return fs[0:count]
 
@@ -198,7 +202,7 @@ class APIManager:
         for mission in missions:
             status, result = self.process_free_mission(mission)
             if status != STATUS_SUCCESS:
-                self.logger.info(result)
+                self.logger.warning(result)
             else:
                 self.logger.info(u"Успешно установили на выполнение миссию")
                 self.logger.info(u"Сервер вернул следующий набор данных: "
@@ -216,7 +220,10 @@ class APIManager:
             mission.get_profession_ids(), free=True)
         if len(matched_followers) < mission.slot_count:
             additional_followers = self.follower_manager.get_efficient(
-                mission.slot_count - len(matched_followers), free=True)
+                mission.slot_count - len(matched_followers), free=True,
+                exclude=matched_followers
+            )
+
             matched_followers = matched_followers + additional_followers
 
         params = {
@@ -227,6 +234,9 @@ class APIManager:
         result = self.session.get(self.urls.START_MISSION_URL, params=params)
         json_data = result.json()
         if json_data.get('spec'):
-            print(json_data['spec']['operationResult'])
-            return STATUS_SUCCESS, json_data['spec']
+            if json_data['spec']['operationResult']['status'] == 'Success':
+                return STATUS_SUCCESS, json_data['spec']
+            else:
+                print(json_data['spec']['operationResult'])
+                return STATUS_ERROR, json_data['spec']['operationResult']
         return STATUS_ERROR, u"Ответ от сервера: {}".format(result.text)

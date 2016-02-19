@@ -60,5 +60,6 @@ class Follower:
     def is_free(self):
         return not self.in_progress
 
-    def get_profession_id(self):
+    @property
+    def profession_id(self):
         return self.profession['id']
