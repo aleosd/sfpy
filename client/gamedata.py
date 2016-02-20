@@ -63,3 +63,7 @@ class Follower:
     @property
     def profession_id(self):
         return self.profession['id']
+
+
+class Game:
+    pass

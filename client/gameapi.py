@@ -185,6 +185,20 @@ class APIManager:
         self.follower_manager = FollowerManager(self.urls, self.session)
         self.update_game_data(data)
 
+    def _handle_call_result(self, status, result):
+        if status == STATUS_SUCCESS:
+            self.logger.info(u"Успешный запрос, сервер вернул \"{}\"".format(
+                result['operationResult']['actionFailCause']
+            ))
+            self.update_game_data(result['updateData'])
+            self.process_game_state()
+        elif status == STATUS_ACTION_NOT_AVAILABLE:
+            self.logger.info(result)
+        else:
+            self.logger.error(u"Ошибка выполнения запроса: \"{}\"".format(
+                result['operationResult']['actionFailCause']
+            ))
+
     def update_game_data(self, data):
         self.progress_manager.add_many(data.get('progresses', []))
         self.mission_manager.add_many(data.get('missions', []))
@@ -200,15 +214,7 @@ class APIManager:
         self.logger.info(u"Доступно бесплатных миссий: {}".format(
             len(missions)))
         for mission in missions:
-            status, result = self.process_free_mission(mission)
-            if status != STATUS_SUCCESS:
-                self.logger.warning(result)
-            else:
-                self.logger.info(u"Успешно установили на выполнение миссию")
-                self.logger.info(u"Сервер вернул следующий набор данных: "
-                                 u"{}".format(result.keys()))
-                self.update_game_data(result['updateData'])
-                self.process_game_state()
+            self._handle_call_result(self.process_free_mission(mission))
 
     def process_free_mission(self, mission):
         self.logger.info(u"Проверяем доступность миссии {}".format(mission.id))
@@ -237,6 +243,5 @@ class APIManager:
             if json_data['spec']['operationResult']['status'] == 'Success':
                 return STATUS_SUCCESS, json_data['spec']
             else:
-                print(json_data['spec']['operationResult'])
-                return STATUS_ERROR, json_data['spec']['operationResult']
+                return STATUS_ERROR, json_data['spec']
         return STATUS_ERROR, u"Ответ от сервера: {}".format(result.text)
