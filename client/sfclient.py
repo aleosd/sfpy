@@ -3,53 +3,27 @@ import logging
 import time
 import random
 
-from .settings import LOGGER_NAME, NEXT_REQUEST_DELAY_MINUTES, HERO_BAG_URL
+from .settings import LOGGER_NAME, NEXT_REQUEST_DELAY_MINUTES
 from .auth import Session
-from .gameapi import APIManager
+from .gamedata import Game
 
 
 class Client:
     def __init__(self):
         self.session = Session()
         self.logger = logging.getLogger(LOGGER_NAME)
-        self.manager = None
-        self.progresses = None
-        self.missions = None
+        self.game = Game()
 
     def run(self):
         self.logger.info(u"Запускается консольный клиент SkyForge")
         self.session.start()
+        self.game.start(self.session)
         while True:
-            hero_bag_data = self._get_hero_bag()
-            if not hero_bag_data:
-                time.sleep(60)
-                self.logger.info(u"Пробуем переустановить сессию")
-                self.session.reset()
-            else:
-                self.parse_data(hero_bag_data['spec'])
-                self.process_state()
-
-                next_request_delay = self._get_next_request_time()
-                self.logger.info(u"До следующего запроса {} "
-                                 u"секунд".format(next_request_delay))
-                time.sleep(next_request_delay)
-
-    def process_state(self):
-        self.logger.info(u"Приступаем к обработке состояния")
-        self.logger.info(u"Проверяем прогресс по миссиям")
-        self.manager.process_game_state()
-
-    def _get_hero_bag(self):
-        self.logger.info(u"Пробуем получить данные HeroBag")
-        r = self.session.get(HERO_BAG_URL)
-        try:
-            return r.json()
-        except ValueError:
-            self.logger.error(u"Ошибка обработки запроса HeroBag:"
-                              u"\n\tстатус ответа: {}"
-                              u"\n\tтекст ответа: {}".format(r.status_code,
-                                                             r.text))
-            return {}
+            next_request_delay = self._get_next_request_time()
+            self.logger.info(u"До следующего запроса {} "
+                             u"секунд".format(next_request_delay))
+            time.sleep(next_request_delay)
+            self.game.turn()
 
     @staticmethod
     def _get_next_request_time():
@@ -63,9 +37,3 @@ class Client:
         delay_range_start = seconds - int(seconds * 0.25)
         delay_range_end = seconds + int(seconds * 0.25)
         return random.randint(delay_range_start, delay_range_end)
-
-    def parse_data(self, data):
-        if not self.manager:
-            self.manager = APIManager(data, session=self.session)
-        else:
-            self.manager.update_game_data(data)
