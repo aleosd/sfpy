@@ -225,26 +225,27 @@ class Game:
 
         :param progresses: Список прогрессов
         """
-        finished = []
         for p in progresses:
             self.logger.info(u"Проверяем состояние прогресса {}".format(p.id))
             if p.is_finished():
                 self.logger.info(
                     u"Прогресс {} завершен, отправляем запрос".format(p.id))
-                self.api.finish_progress(p)
-                finished.append(p)
+                status, result = self.api.finish_progress(p)
+                success = self._handle_call_result(status, result)
+                if success:
+                    break
             else:
                 self.logger.info(u"До окончания прогресса {} еще {}".format(
                     p.id, p.time_elapsed_verbose()))
-        # если были завершенные задачи - удаляем их из списка
-        for finished_p in finished:
-            self.progress_manager.remove_progress(finished_p)
 
     def process_free_missions(self, missions):
         self.logger.info(u"Доступно бесплатных миссий: {}".format(
             len(missions)))
         for mission in missions:
-            self._handle_call_result(self.process_free_mission(mission))
+            status, result = self.process_free_mission(mission)
+            success = self._handle_call_result(status, result)
+            if success:
+                break
 
     def process_free_mission(self, mission):
         self.logger.info(u"Проверяем доступность миссии {}".format(mission.id))
@@ -271,10 +272,12 @@ class Game:
             ))
             self.update_state(result['updateData'])
             self.process_state()
+            return True
         elif status == self.api.STATUS_ACTION_NOT_AVAILABLE:
             self.logger.info(result)
-        else:
+        elif status == self.api.STATUS_GAME_ERROR:
             self.logger.error(u"Ошибка выполнения запроса: \"{}\"".format(
                 result['operationResult']['actionFailCause']
             ))
-
+        else:
+            self.logger.critical(result)

@@ -17,6 +17,7 @@ class APIManager:
     STATUS_SUCCESS = 0
     STATUS_ERROR = 1
     STATUS_ACTION_NOT_AVAILABLE = 2
+    STATUS_GAME_ERROR = 3
 
     def __init__(self):
         self.logger = logging.getLogger(LOGGER_NAME)
@@ -42,13 +43,7 @@ class APIManager:
         }
         self.logger.debug(u"Отправляем данные {}".format(params))
         result = self.session.get(self.urls.START_MISSION_URL, params=params)
-        json_data = result.json()
-        if json_data.get('spec'):
-            if json_data['spec']['operationResult']['status'] == 'Success':
-                return self.STATUS_SUCCESS, json_data['spec']
-            else:
-                return self.STATUS_ERROR, json_data['spec']
-        return self.STATUS_ERROR, u"Ответ от сервера: {}".format(result.text)
+        return self._process_api_response(result)
 
     def finish_progress(self, progress):
         u"""
@@ -56,16 +51,22 @@ class APIManager:
 
         :param progress: Progress obj
         """
-        if not progress.is_finished():
-            self.logger.warning(u"Нельзя завершить незаконченное задание!")
-        else:
-            data = {'progressId': progress.id}
-            r = self.session.get(self.urls.FINISH_PROGRESS_URL, params=data)
-            if r.status_code == 200:
-                self.logger.info(u"Успешно подтвердили завершение миссии")
+        data = {'progressId': progress.id}
+        result = self.session.get(self.urls.FINISH_PROGRESS_URL, params=data)
+        return self._process_api_response(result)
+
+    def _process_api_response(self, response_data):
+        try:
+            json_data = response_data.json()
+        except ValueError:
+            return self.STATUS_ERROR, u"Сервер не вернул корректного JSON"
+        if json_data.get('spec'):
+            if json_data['spec']['operationResult']['status'] == 'Success':
+                return self.STATUS_SUCCESS, json_data['spec']
             else:
-                self.logger.warning(u"Запрос на завершение миссии вернул "
-                                    u"статус код {}".format(r.status_code))
+                return self.STATUS_GAME_ERROR, json_data['spec']
+        return self.STATUS_ERROR, u"Ответ от сервера не содержит данных " \
+                                  u"'spec': {}".format(json_data.keys())
 
     def _get_hero_bag(self):
         self.logger.info(u"Пробуем получить данные HeroBag")
@@ -78,8 +79,8 @@ class APIManager:
                               u"\n\tстатус ответа: {}"
                               u"\n\tтекст ответа: {}".format(r.status_code,
                                                              r.text))
+            return {}
         except KeyError:
             self.logger.error(u"Ответ не содержит данных heroBag: "
                               u"{}".format(r.json().keys()))
-        finally:
             return {}
