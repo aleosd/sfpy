@@ -43,6 +43,7 @@ class Mission:
         self._price = kwargs['price']
         self._professions = kwargs['professions']
         self.slot_count = kwargs['slotCount']
+        self.quality_name = kwargs['missionQualityName']
 
     def is_free(self):
         return not (self._price['currencies'] or self._price['resources'])
@@ -53,6 +54,18 @@ class Mission:
     def get_profession_ids(self):
         return [i['id'] for i in self._professions]
 
+    def is_mining(self):
+        return self.quality_name == u"Добыча ресурсов" and self.is_free()
+
+    def is_battle(self):
+        return self.quality_name == u"Боевое задание"
+
+    def is_cult(self):
+        return self.quality_name == u"Развитие культа"
+
+    def is_invasion(self):
+        return self.quality_name == u"Вторжение"
+
 
 class Follower:
     def __init__(self, **kwargs):
@@ -61,7 +74,7 @@ class Follower:
         self.in_progress = kwargs['inProgress']
         self.profession = kwargs['profession']
 
-    def is_free(self):
+    def is_available(self):
         return not self.in_progress
 
     @property
@@ -117,7 +130,7 @@ class MissionManager:
     def clear(self):
         self.missions = {}
 
-    def free_missions(self):
+    def mining_missions(self):
         u"""
         Возвращает список с миссиями, доступными для выполнения и не требующими
         ресурсов. Список отсортирован по возрастанию длинтельности миссии и
@@ -125,7 +138,7 @@ class MissionManager:
 
         :return: List of missions
         """
-        missions = [m for m in self.missions.values() if m.is_free() and
+        missions = [m for m in self.missions.values() if m.is_mining() and
                     m.is_available()]
         return sorted(missions, key=lambda m: (m.duration, m.slot_count))
 
@@ -149,7 +162,7 @@ class FollowerManager:
         self.followers = {}
 
     def free_followers(self):
-        return {k: f for k, f in self.followers.items() if f.is_free()}
+        return {k: f for k, f in self.followers.items() if f.is_available()}
 
     def get_for_profession(self, profession, free=False):
         u"""
@@ -196,6 +209,7 @@ class Game:
         self.mission_manager = MissionManager()
         self.follower_manager = FollowerManager()
         self.api = APIManager()
+        self.data_has_changed = False
 
     def start(self, session):
         start_data = self.api.start(session)
@@ -214,9 +228,13 @@ class Game:
 
     def process_state(self):
         self.process_progresses(self.progress_manager.get_progress_list())
-        free_missions = self.mission_manager.free_missions()
-        if len(free_missions) > 0:
-            self.process_free_missions(free_missions)
+        mining_missions = self.mission_manager.mining_missions()
+        if len(mining_missions) > 0:
+            self.process_mining_missions(mining_missions)
+        if self.data_has_changed:
+            self.logger.info(u"Данные изменились, обрабатываем повторно")
+            self.data_has_changed = False
+            self.process_state()
 
     def process_progresses(self, progresses):
         u"""
@@ -226,29 +244,29 @@ class Game:
         :param progresses: Список прогрессов
         """
         for p in progresses:
+            if self.data_has_changed:
+                break
             self.logger.info(u"Проверяем состояние прогресса {}".format(p.id))
             if p.is_finished():
                 self.logger.info(
                     u"Прогресс {} завершен, отправляем запрос".format(p.id))
                 status, result = self.api.finish_progress(p)
-                success = self._handle_call_result(status, result)
-                if success:
-                    break
+                self._handle_call_result(status, result)
             else:
                 self.logger.info(u"До окончания прогресса {} еще {}".format(
                     p.id, p.time_elapsed_verbose()))
 
-    def process_free_missions(self, missions):
-        self.logger.info(u"Доступно бесплатных миссий: {}".format(
+    def process_mining_missions(self, missions):
+        self.logger.info(u"Доступно миссий по добыче ресурсов: {}".format(
             len(missions)))
         for mission in missions:
-            status, result = self.process_free_mission(mission)
-            success = self._handle_call_result(status, result)
-            if success:
+            if self.data_has_changed:
                 break
+            status, result = self.process_mining_mission(mission)
+            self._handle_call_result(status, result)
 
-    def process_free_mission(self, mission):
-        self.logger.info(u"Проверяем доступность миссии {}".format(mission.id))
+    def process_mining_mission(self, mission):
+        self.logger.info(u"Пробуем запустить миссию {}".format(mission.id))
         followers = self.follower_manager.free_followers()
         if mission.slot_count > len(followers):
             return self.api.STATUS_ACTION_NOT_AVAILABLE, \
@@ -271,8 +289,7 @@ class Game:
                 result['operationResult']['actionFailCause']
             ))
             self.update_state(result['updateData'])
-            self.process_state()
-            return True
+            self.data_has_changed = True
         elif status == self.api.STATUS_ACTION_NOT_AVAILABLE:
             self.logger.info(result)
         elif status == self.api.STATUS_GAME_ERROR:
