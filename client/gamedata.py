@@ -44,6 +44,7 @@ class Mission:
         self._professions = kwargs['professions']
         self.slot_count = kwargs['slotCount']
         self.quality_name = kwargs['missionQualityName']
+        self.mission_type = kwargs['missionType']
 
     def is_free(self):
         return not (self._price['currencies'] or self._price['resources'])
@@ -65,6 +66,9 @@ class Mission:
 
     def is_invasion(self):
         return self.quality_name == u"Вторжение"
+
+    def is_case(self):
+        return self.mission_type == "Case"
 
 
 class Follower:
@@ -141,6 +145,10 @@ class MissionManager:
         missions = [m for m in self.missions.values() if m.is_mining() and
                     m.is_available()]
         return sorted(missions, key=lambda m: (m.duration, m.slot_count))
+
+    def case_missions(self):
+        return [m for m in self.missions.values() if m.is_case() and
+                m.is_available()]
 
 
 class FollowerManager:
@@ -228,8 +236,11 @@ class Game:
 
     def process_state(self):
         self.process_progresses(self.progress_manager.get_progress_list())
+        case_missions = self.mission_manager.case_missions()
+        if case_missions:
+            self.process_case_missions(case_missions)
         mining_missions = self.mission_manager.mining_missions()
-        if len(mining_missions) > 0:
+        if mining_missions:
             self.process_mining_missions(mining_missions)
         if self.data_has_changed:
             self.logger.info(u"Данные изменились, обрабатываем повторно")
@@ -282,6 +293,25 @@ class Game:
 
             matched_followers = matched_followers + additional_followers
         return self.api.start_mission(mission, matched_followers)
+
+    def process_case_missions(self, missions):
+        self.logger.info(u"Доступно ивентовых миссий: {}".format(len(missions)))
+        for mission in missions:
+            if self.data_has_changed:
+                break
+            status, result = self.process_case_mission(mission)
+            self._handle_call_result(status, result)
+
+    def process_case_mission(self, mission):
+        self.logger.info(u"Пробуем запустить миссию {}".format(mission.id))
+        followers = self.follower_manager.free_followers()
+        if mission.slot_count > len(followers):
+            return self.api.STATUS_ACTION_NOT_AVAILABLE, \
+                   u"Недостаточно последователей"
+
+        followers = self.follower_manager.get_efficient(free=True)
+
+        return self.api.start_mission(mission, followers[-mission.slot_count:])
 
     def _handle_call_result(self, status, result):
         if status == self.api.STATUS_SUCCESS:
