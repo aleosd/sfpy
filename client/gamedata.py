@@ -29,7 +29,7 @@ class Progress:
 
     def time_elapsed_verbose(self):
         eta = self.time_elapsed()
-        return "{}:{}:{}".format(
+        return "{:02d}:{:02d}:{:02d}".format(
             eta.seconds // 3600,
             (eta.seconds // 60) % 60,
             eta.seconds % 60
@@ -42,7 +42,9 @@ class Progress:
 class Mission:
     def __init__(self, **kwargs):
         self.id = kwargs['id']
+        self.name = kwargs['name']
         self.in_progress = kwargs['inProgress']
+        self.is_success = kwargs['isSuccess']
         self.difficulty = kwargs['difficulty']
         self.duration = kwargs['duration']
         self.experience = kwargs['experience']
@@ -75,6 +77,11 @@ class Mission:
 
     def is_case(self):
         return self.mission_type == "Case"
+
+    def result(self):
+        if self.is_success:
+            return u"успех"
+        return u"неудача"
 
 
 class Follower:
@@ -155,6 +162,9 @@ class MissionManager:
     def case_missions(self):
         return [m for m in self.missions.values() if m.is_case() and
                 m.is_available()]
+
+    def get(self, id_):
+        return self.missions.get(id_)
 
 
 class FollowerManager:
@@ -264,15 +274,18 @@ class Game:
         for p in progresses:
             if self.data_has_changed:
                 break
-            self.logger.info(u"Проверяем состояние прогресса {}".format(p.id))
+            mission = self.mission_manager.get(p.mission_id)
+            self.logger.info(u"Проверяем состояние прогресса {} по "
+                             u"миссии \"{}\"".format(p.id, mission.name))
             if p.is_finished():
                 self.logger.info(
                     u"Прогресс {} завершен, отправляем запрос".format(p.id))
                 status, result = self.api.finish_progress(p)
                 self._handle_call_result(status, result)
             else:
-                self.logger.info(u"До окончания прогресса {} еще {}".format(
-                    p.id, p.time_elapsed_verbose()))
+                self.logger.info(
+                    u"До окончания прогресса {} еще {}, результат - {}".format(
+                        p.id, p.time_elapsed_verbose(), mission.result()))
 
     def process_mining_missions(self, missions):
         self.logger.info(u"Доступно миссий по добыче ресурсов: {}".format(
