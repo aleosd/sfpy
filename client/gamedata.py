@@ -7,12 +7,15 @@ from .gameapi import APIManager
 
 
 class Progress:
+    TYPE_MISSION = "FUSE"
+
     def __init__(self, **kwargs):
         self.id = kwargs['id']
         self.mission_id = kwargs['fuseData']['missionId']
         self.finished = kwargs['finished']
         self.start_time = self.time_from_ms(kwargs['startTime'])
         self.end_time = self.time_from_ms(kwargs['endTime'])
+        self.type = kwargs['type']
 
     @staticmethod
     def time_from_ms(ms):
@@ -31,6 +34,9 @@ class Progress:
             (eta.seconds // 60) % 60,
             eta.seconds % 60
         )
+
+    def is_mission(self):
+        return self.type == self.TYPE_MISSION
 
 
 class Mission:
@@ -110,8 +116,8 @@ class ProgressManager:
     def clear(self):
         self.progresses = {}
 
-    def get_progress_list(self):
-        return self.progresses.values()
+    def get_mission_progress_list(self):
+        return [p for p in self.progresses.values() if p.is_mission()]
 
 
 class MissionManager:
@@ -235,7 +241,8 @@ class Game:
         self.follower_manager.add_many(data.get('followers', []))
 
     def process_state(self):
-        self.process_progresses(self.progress_manager.get_progress_list())
+        self.process_progresses(
+            self.progress_manager.get_mission_progress_list())
         case_missions = self.mission_manager.case_missions()
         if case_missions:
             self.process_case_missions(case_missions)
