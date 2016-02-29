@@ -7,7 +7,7 @@ from fake_useragent import UserAgent
 from requests.exceptions import RequestException
 
 from .settings import LOGGER_NAME, AUTH_RETRY_DELAY_SECONDS, PAGE, DOMAIN, \
-    USERNAME, PASSWORD, USER_AGENT
+    USERNAME, PASSWORD, USER_AGENT, CHECK_URL
 
 
 SF_PORTAL_URL = 'https://portal.sf.mail.ru/skyforgenews'
@@ -72,6 +72,13 @@ class Session:
         kwargs['params'] = params
         return self.session.get(url, headers=self.XHR_HEADERS, **kwargs)
 
+    @staticmethod
+    def healthchecks_request():
+        if CHECK_URL:
+            try:
+                requests.get(CHECK_URL)
+            except RequestException:
+                pass
 
 if __name__ == '__main__':
     URL = 'https://portal.sf.mail.ru/cult/HeroBag:loadData'

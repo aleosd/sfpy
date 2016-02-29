@@ -73,6 +73,7 @@ class APIManager:
         r = self.session.get(HERO_BAG_URL)
         try:
             response_json = r.json()
+            self.session.healthchecks_request()
             return response_json['spec']
         except ValueError:
             self.logger.error(u"Ошибка обработки запроса HeroBag:"

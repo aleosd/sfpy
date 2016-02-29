@@ -20,6 +20,7 @@ PASSWORD = config.get('Auth', 'Password')
 USER_AGENT = config.get('Auth', 'UserAgent', fallback=None)
 
 LOGGER_NAME = 'sf-logger'
+CHECK_URL = config.get('Admin', 'Check_URL', fallback=None)
 
 NEXT_REQUEST_DELAY_MINUTES = 6
 AUTH_RETRY_DELAY_SECONDS = 60
