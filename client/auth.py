@@ -66,6 +66,9 @@ class Session:
             'saveauth': 0
         }
         r = self.session.post(AUTH_URL, data=auth_data, cookies=self.cookies)
+        if 'fail=1' in r.url:
+            logging.critical(u"Ошибка аутентификации на сервере")
+            sys.exit(1)
 
     def get(self, url, **kwargs):
         params = kwargs.get('params', {})
@@ -80,11 +83,3 @@ class Session:
                 requests.get(CHECK_URL)
             except RequestException:
                 pass
-
-if __name__ == '__main__':
-    URL = 'https://portal.sf.mail.ru/cult/HeroBag:loadData'
-
-    session = Session()
-    session.start()
-    r = session.get(URL)
-    print(r.json())
