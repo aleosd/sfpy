@@ -8,14 +8,16 @@ from .gameapi import APIManager
 
 class Progress:
     TYPE_MISSION = "FUSE"
+    TYPE_UPGRADE = "UPGRADE"
 
     def __init__(self, **kwargs):
         self.id = kwargs['id']
-        self.mission_id = kwargs['fuseData']['missionId']
         self.finished = kwargs['finished']
         self.start_time = self.time_from_ms(kwargs['startTime'])
         self.end_time = self.time_from_ms(kwargs['endTime'])
         self.type = kwargs['type']
+        if self.is_mission():
+            self.mission_id = kwargs['fuseData']['missionId']
 
     @staticmethod
     def time_from_ms(ms):
