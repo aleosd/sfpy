@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 import time
+import sys
 
 import requests
 from fake_useragent import UserAgent
@@ -64,7 +65,7 @@ class Session:
             'Password': PASSWORD,
             'saveauth': 0
         }
-        self.session.post(AUTH_URL, data=auth_data, cookies=self.cookies)
+        r = self.session.post(AUTH_URL, data=auth_data, cookies=self.cookies)
 
     def get(self, url, **kwargs):
         params = kwargs.get('params', {})

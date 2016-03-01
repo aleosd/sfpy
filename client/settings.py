@@ -1,14 +1,21 @@
 # -*- coding: UTF-8 -*-
+import argparse
 import configparser
 import os
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)
+
 CONFIG_FILE = 'sfpy.conf'
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--config-file', default=CONFIG_FILE,
+                    type=argparse.FileType('r'))
+args = parser.parse_args()
 
 
 def get_config():
     conf = configparser.ConfigParser()
-    conf.read(os.path.join(ROOT, CONFIG_FILE))
+    conf.read_file(args.config_file)
     return conf
 
 config = get_config()
