@@ -6,6 +6,14 @@ from .settings import LOGGER_NAME
 from .gameapi import APIManager
 
 
+class Resources:
+    def __init__(self):
+        self.wallet = {}
+
+    def add(self, data):
+        self.wallet = data.get('wallet', {})
+
+
 class Progress:
     TYPE_MISSION = "FUSE"
     TYPE_UPGRADE = "UPGRADE"
@@ -234,6 +242,7 @@ class Game:
         self.progress_manager = ProgressManager()
         self.mission_manager = MissionManager()
         self.follower_manager = FollowerManager()
+        self.resources = Resources()
         self.api = APIManager()
         self.data_has_changed = False
 
@@ -248,6 +257,7 @@ class Game:
         self.process_state()
 
     def update_state(self, data):
+        self.resources.add(data)
         self.progress_manager.add_many(data.get('progresses', []))
         self.mission_manager.add_many(data.get('missions', []))
         self.follower_manager.add_many(data.get('followers', []))
