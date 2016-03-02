@@ -13,6 +13,12 @@ class Resources:
     def add(self, data):
         self.wallet = data.get('wallet', {})
 
+    def is_enough_for_mission(self, mission):
+        for currency_data in mission.price['currencies']:
+            if self.wallet.get(currency_data['id'], 0) < currency_data['amount']:
+                return False
+        return True
+
 
 class Progress:
     TYPE_MISSION = "FUSE"
@@ -58,14 +64,14 @@ class Mission:
         self.difficulty = kwargs['difficulty']
         self.duration = kwargs['duration']
         self.experience = kwargs['experience']
-        self._price = kwargs['price']
+        self.price = kwargs['price']
         self._professions = kwargs['professions']
         self.slot_count = kwargs['slotCount']
         self.quality_name = kwargs['missionQualityName']
         self.mission_type = kwargs['missionType']
 
     def is_free(self):
-        return not (self._price['currencies'] or self._price['resources'])
+        return not (self.price['currencies'] or self.price['resources'])
 
     def is_available(self):
         return not self.in_progress
@@ -169,6 +175,11 @@ class MissionManager:
                     m.is_available()]
         return sorted(missions, key=lambda m: (m.duration, m.slot_count))
 
+    def invasion_missions(self):
+        missions = [m for m in self.missions.values() if m.is_invasion() and
+                    m.is_available()]
+        return sorted(missions, key=lambda m: (m.duration, m.slot_count))
+
     def case_missions(self):
         return [m for m in self.missions.values() if m.is_case() and
                 m.is_available()]
@@ -215,7 +226,7 @@ class FollowerManager:
             return [f for f in followers if f.profession_id == profession]
         raise ValueError(u"Profession must be an int or list or tuple")
 
-    def get_efficient(self, count=-1, free=False, exclude=None):
+    def get_efficient(self, count=None, free=False, exclude=None):
         u"""
         Возвращает отсортированный по эффективности список адептов.
         При помощи count можно указать ограничение на количество возвращаемых
@@ -270,7 +281,10 @@ class Game:
             self.process_case_missions(case_missions)
         mining_missions = self.mission_manager.mining_missions()
         if mining_missions:
-            self.process_mining_missions(mining_missions)
+            self.process_missions(mining_missions)
+        invasion_missions = self.mission_manager.invasion_missions()
+        if invasion_missions:
+            self.process_missions(invasion_missions)
         if self.data_has_changed:
             self.logger.info(u"Данные изменились, обрабатываем повторно")
             self.data_has_changed = False
@@ -299,21 +313,25 @@ class Game:
                     u"До окончания прогресса {} еще {}, результат - {}".format(
                         p.id, p.time_elapsed_verbose(), mission.result()))
 
-    def process_mining_missions(self, missions):
-        self.logger.info(u"Доступно миссий по добыче ресурсов: {}".format(
-            len(missions)))
+    def process_missions(self, missions):
+        self.logger.info(u"Доступно миссий {}: {}".format(
+            missions[0].quality_name, len(missions)))
         for mission in missions:
             if self.data_has_changed:
                 break
-            status, result = self.process_mining_mission(mission)
+            status, result = self.process_mission(mission)
             self._handle_call_result(status, result)
 
-    def process_mining_mission(self, mission):
+    def process_mission(self, mission):
         self.logger.info(u"Пробуем запустить миссию {}".format(mission.id))
         followers = self.follower_manager.free_followers()
         if mission.slot_count > len(followers):
             return self.api.STATUS_ACTION_NOT_AVAILABLE, \
                    u"Недостаточно последователей"
+
+        if not self.resources.is_enough_for_mission(mission):
+            return self.api.STATUS_ACTION_NOT_AVAILABLE, \
+                   u"Недостаточно ресурсов"
 
         matched_followers = self.follower_manager.get_for_profession(
             mission.get_profession_ids(), free=True)
