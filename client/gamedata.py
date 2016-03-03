@@ -15,7 +15,8 @@ class Resources:
 
     def is_enough_for_mission(self, mission):
         for currency_data in mission.price['currencies']:
-            if self.wallet.get(currency_data['id'], 0) < currency_data['amount']:
+            currency_id = str(currency_data['id'])
+            if self.wallet.get(currency_id, 0) < currency_data['amount']:
                 return False
         return True
 
