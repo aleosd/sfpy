@@ -5,7 +5,7 @@ import sys
 
 import requests
 from fake_useragent import UserAgent
-from requests.exceptions import RequestException
+from requests.exceptions import RequestException, Timeout
 
 from .settings import LOGGER_NAME, AUTH_RETRY_DELAY_SECONDS, PAGE, DOMAIN, \
     USERNAME, PASSWORD, USER_AGENT, CHECK_URL
@@ -74,7 +74,19 @@ class Session:
         params = kwargs.get('params', {})
         params.update({'csrf_token': self.csrf_token})
         kwargs['params'] = params
-        return self.session.get(url, headers=self.XHR_HEADERS, **kwargs)
+        success = False
+        while not success:
+            try:
+                result = self.session.get(
+                    url, headers=self.XHR_HEADERS, timeout=10, **kwargs)
+                success = True
+                return result
+            except Timeout as e:
+                self.logger.error(
+                    u"Ошибка обращение к серверу, время ожидания истекло: "
+                    u"{}".format(e))
+                time.sleep(30)
+
 
     @staticmethod
     def healthchecks_request():
