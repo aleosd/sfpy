@@ -1,16 +1,34 @@
 # -*- coding: UTF-8 -*-
 import logging
+import time
+import sys
 
 from .settings import LOGGER_NAME, HERO_BAG_URL
 
 
 class ApiURLS:
-    FINISH_PROGRESS_URL = ''
-    START_MISSION_URL = ''
+    def __init__(self):
+        self.logger = logging.getLogger(LOGGER_NAME)
+        self.FINISH_PROGRESS_URL = ''
+        self.START_MISSION_URL = ''
+        self._empty = True
 
-    def __init__(self, data):
-        self.FINISH_PROGRESS_URL = data['finishProgressOperationLink']
-        self.START_MISSION_URL = data['fuseOperationLink']
+    @staticmethod
+    def _data_valid(data):
+        return ('finishProgressOperationLink' in data and
+                'fuseOperationLink' in data)
+
+    def set(self, data):
+        if not self._data_valid(data):
+            if self._empty:
+                self.logger.critical(u"Данные не содержат информации по url")
+                sys.exit(1)
+            self.logger.warning(u"Данные не содержат информации о ссылках, "
+                                u"используем старые")
+        else:
+            self.FINISH_PROGRESS_URL = data['finishProgressOperationLink']
+            self.START_MISSION_URL = data['fuseOperationLink']
+            self._empty = False
 
 
 class APIManager:
@@ -21,7 +39,7 @@ class APIManager:
 
     def __init__(self):
         self.logger = logging.getLogger(LOGGER_NAME)
-        self.urls = None
+        self.urls = ApiURLS()
         self.session = None
         self.started = False
 
@@ -33,7 +51,7 @@ class APIManager:
     def get_game_data(self):
         assert self.started is True
         data = self._get_hero_bag()
-        self.urls = ApiURLS(data)
+        self.urls.set(data)
         return data
 
     def start_mission(self, mission, followers):
@@ -70,7 +88,16 @@ class APIManager:
 
     def _get_hero_bag(self):
         self.logger.info(u"Пробуем получить данные HeroBag")
-        r = self.session.get(HERO_BAG_URL)
+        response_success = False
+        while not response_success:
+            r = self.session.get(HERO_BAG_URL)
+            if r.status_code == 200:
+                response_success = True
+            else:
+                self.logger.error(
+                    u"Сервер вернул ответ со статусом {}, "
+                    u"повторный запрос через 5 минут".format(r.status_code))
+                time.sleep(300)
         try:
             response_json = r.json()
             self.session.healthchecks_request()
