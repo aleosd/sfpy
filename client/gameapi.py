@@ -98,17 +98,58 @@ class APIManager:
                     u"Сервер вернул ответ со статусом {}, "
                     u"повторный запрос через 5 минут".format(r.status_code))
                 time.sleep(300)
-        try:
-            response_json = r.json()
-            self.session.healthchecks_request()
-            return response_json['spec']
-        except ValueError:
-            self.logger.error(u"Ошибка обработки запроса HeroBag:"
-                              u"\n\tстатус ответа: {}"
-                              u"\n\tтекст ответа: {}".format(r.status_code,
-                                                             r.text))
-            return {}
-        except KeyError:
-            self.logger.error(u"Ответ не содержит данных heroBag: "
-                              u"{}".format(r.json().keys()))
-            return {}
+
+        self.session.healthchecks_request()
+
+        response = ApiResponse(r)
+        if response.is_valid():
+            return response.data
+
+        self.logger.error(response.description)
+        if response.status == ApiResponse.STATUS_AUTH_ERROR:
+            self.session.reset()
+            self.session.start()
+            return self._get_hero_bag()
+        return response.data
+
+
+class ApiResponse:
+    STATUS_SUCCESS = 1
+    STATUS_AUTH_ERROR = 2
+    STATUS_UNKNOWN = 3
+    STATUS_JSON_ERROR = 4
+    STATUS_DATA_ERROR = 5
+
+    STATUS_DESCRIPTION = {
+        STATUS_SUCCESS: "Успешный запрос",
+        STATUS_AUTH_ERROR: "Ошибка аутентификации",
+        STATUS_UNKNOWN: "Статус неизвестен",
+        STATUS_JSON_ERROR: "Ответ не содержит корректных json-данных",
+        STATUS_DATA_ERROR: "Неверный формат json-данных",
+    }
+
+    def __init__(self, response):
+        self.response = response
+        self.status = self.STATUS_UNKNOWN
+        self.data = {}
+        self.check_response()
+
+    def check_response(self):
+        if self.response.headers.get('content-type') == 'application/json;charset=UTF-8':
+            try:
+                data = self.response.json()
+                self.data = data['spec']
+                self.status = self.STATUS_SUCCESS
+            except ValueError:
+                self.status = self.STATUS_JSON_ERROR
+            except KeyError:
+                self.status = self.STATUS_DATA_ERROR
+        else:
+            self.status = self.STATUS_AUTH_ERROR
+
+    def is_valid(self):
+        return self.status == self.STATUS_SUCCESS
+
+    @property
+    def description(self):
+        return self.STATUS_DESCRIPTION[self.status]
