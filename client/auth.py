@@ -5,7 +5,7 @@ import sys
 
 import requests
 from fake_useragent import UserAgent
-from requests.exceptions import RequestException, Timeout
+from requests.exceptions import RequestException, Timeout, ConnectionError
 
 from .settings import LOGGER_NAME, AUTH_RETRY_DELAY_SECONDS, PAGE, DOMAIN, \
     USERNAME, PASSWORD, USER_AGENT, CHECK_URL
@@ -86,7 +86,9 @@ class Session:
                     u"Ошибка обращение к серверу, время ожидания истекло: "
                     u"{}".format(e))
                 time.sleep(30)
-
+            except ConnectionError as e:
+                self.logger.error(u"Сервер недоступен: {}".format(e))
+                time.sleep(30)
 
     @staticmethod
     def healthchecks_request():
