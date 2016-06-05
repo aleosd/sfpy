@@ -5,7 +5,7 @@ import sys
 
 import requests
 from fake_useragent import UserAgent
-from requests.exceptions import RequestException, Timeout
+from requests.exceptions import RequestException, Timeout, ConnectionError
 
 from .settings import LOGGER_NAME, AUTH_RETRY_DELAY_SECONDS, PAGE, DOMAIN, \
     USERNAME, PASSWORD, USER_AGENT, CHECK_URL
@@ -43,7 +43,7 @@ class Session:
 
     def reset(self):
         self.cookies = {}
-        self.authenticate()
+        self.session = requests.Session()
 
     def get_cookies(self):
         return self.cookies
@@ -57,6 +57,7 @@ class Session:
         response = self.session.get(SF_PORTAL_URL)
         for cookie in response.cookies:
             self.cookies[cookie.name] = cookie.value
+        self.logger.debug("Установленные cookies: {}".format(self.cookies))
         self.logger.info(u"Отправляем данные для аутентификации")
         auth_data = {
             'Page': PAGE,
@@ -65,7 +66,7 @@ class Session:
             'Password': PASSWORD,
             'saveauth': 0
         }
-        r = self.session.post(AUTH_URL, data=auth_data, cookies=self.cookies)
+        r = self.session.post(AUTH_URL, data=auth_data)
         if 'fail=1' in r.url:
             logging.critical(u"Ошибка аутентификации на сервере")
             sys.exit(1)
@@ -86,7 +87,9 @@ class Session:
                     u"Ошибка обращение к серверу, время ожидания истекло: "
                     u"{}".format(e))
                 time.sleep(30)
-
+            except ConnectionError as e:
+                self.logger.error(u"Сервер недоступен: {}".format(e))
+                time.sleep(30)
 
     @staticmethod
     def healthchecks_request():

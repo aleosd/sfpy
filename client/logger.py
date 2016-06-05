@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 import logging
 
+import colorlog
+
 
 def configure_logger(name):
     logger = logging.getLogger(name)
@@ -11,9 +13,16 @@ def configure_logger(name):
     ch.setLevel(logging.INFO)
 
     # create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s:%(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+    formatter = colorlog.ColoredFormatter(
+        '%(cyan)s%(asctime)s%(reset)s - %(name)s:%(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        log_colors={
+            'DEBUG':    'cyan',
+            'INFO':     'green',
+            'WARNING':  'yellow',
+            'ERROR':    'red',
+            'CRITICAL': 'red,bg_white',
+        },
     )
     # removing milliseconds from logger time
     formatter.default_msec_format = formatter.default_time_format

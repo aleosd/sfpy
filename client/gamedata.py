@@ -185,6 +185,10 @@ class MissionManager:
         return [m for m in self.missions.values() if m.is_case() and
                 m.is_available()]
 
+    def cult_missions(self):
+        return [m for m in self.missions.values() if m.is_cult() and
+                m.is_available()]
+
     def get(self, id_):
         return self.missions.get(id_)
 
@@ -286,6 +290,9 @@ class Game:
         invasion_missions = self.mission_manager.invasion_missions()
         if invasion_missions:
             self.process_missions(invasion_missions)
+        cult_missions = self.mission_manager.cult_missions()
+        if cult_missions:
+            self.process_missions(cult_missions)
         if self.data_has_changed:
             self.logger.info(u"Данные изменились, обрабатываем повторно")
             self.data_has_changed = False
