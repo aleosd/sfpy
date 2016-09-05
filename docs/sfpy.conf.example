@@ -1,0 +1,16 @@
+[Auth]
+Page=https://portal.sf.mail.ru/skyforgenews
+# mail.ru username, "myusername" For email myusername@mail.ru
+Login=username
+Domain=mail.ru
+# mail.ru password
+Password=password
+# useragent to fake
+UserAgent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.109 Safari/537.36
+# reserved for future usage, not required
+saveauth=0
+
+[Admin]
+# url on https://healthchecks.io/, to notify if sfpy client is down
+# this setting is not required
+Check_URL=https://hchk.io/aaaaaaaa-bbbb-cccc-dddd-ffffffffffff
